@@ -55,36 +55,38 @@ function ItemDAO(database) {
 
         var count = 0;
 
-        MongoClient.connect('mongodb://localhost:27017/mongomart', function(err, db) {
+        console.log("Successfully connected to MongoDB.");
+        var query = [
+            {$group:{
+                _id:"$category",
+                "num":{$sum:1}
+            }},
+            {$sort:{"_id":1}}
+        ];
+    
+        this.db.collection('item').aggregate(query, function(err, docs) {
             assert.equal(err, null);
-            console.log("Successfully connected to MongoDB.");
-            var query = [
-                {$group:{
-                    _id:"$category",
-                    "num":{$sum:1}
-                }},
-                {$sort:{"_id":1}}
-            ];
-        
-            db.collection('item').aggregate(query, function(err, docs) {
-                assert.equal(err, null);
-                // console.log(docs);
-                var s;
-                for(s of docs) {
-                    // console.log(s.num);
-                    categories.push( s );
-                    count += s.num;
-                }                
-                db.close();
-                var category = {
-                    _id: "All",
-                    num: count
-                };
-                categories.unshift(category);
-                // console.log(categories);
-                callback(categories);
-            });
+            // console.log(docs);
+            var s;
+            for(s of docs) {
+                // console.log(s.num);
+                categories.push( s );
+                count += s.num;
+            }                
+            // db.close();
+            var category = {
+                _id: "All",
+                num: count
+            };
+            categories.unshift(category);
+            // console.log(categories);
+            callback(categories);
         });
+
+        // MongoClient.connect('mongodb://localhost:27017/mongomart', function(err, db) {
+        //     assert.equal(err, null);
+            
+        // });
     }
 
 
@@ -114,30 +116,25 @@ function ItemDAO(database) {
          */
 
         var pageItems = [];
-
-        MongoClient.connect('mongodb://localhost:27017/mongomart', function(err, db) {
-            assert.equal(err, null);
-            var query;
-            if(category === 'All') {
-                query = {};
-            }
-            else {
-                query = {"category":category};
-            }
-            
-            var skip_items = page*itemsPerPage;
-            var options = ({
-                "limit":itemsPerPage,
-                "skip":skip_items,
-                "sort":"_id"
-            });
+        var query;
+        if(category === 'All') {
+            query = {};
+        }
+        else {
+            query = {"category":category};
+        }
         
-            db.collection('item').find(query,options).toArray(function(err, docs) {
-                assert.equal(err, null);
-                callback(docs);
-            });
+        var skip_items = page*itemsPerPage;
+        var options = ({
+            "limit":itemsPerPage,
+            "skip":skip_items,
+            "sort":"_id"
         });
-
+    
+        this.db.collection('item').find(query,options).toArray(function(err, docs) {
+            assert.equal(err, null);
+            callback(docs);
+        });
         // TODO-lab1B Replace all code above (in this method).
 
         // TODO Include the following line in the appropriate
@@ -166,24 +163,24 @@ function ItemDAO(database) {
          * of a call to the getNumItems() method.
          *
          */
-
+        var query;
+        if(category === 'All') {
+            query = {};
+        }
+        else {
+            query = {"category":category};
+        }
+    
+        this.db.collection('item').find(query).count(function(err, docs) {
+            assert.equal(err, null);
+            callback(docs);
+        });
          // TODO Include the following line in the appropriate
          // place within your code to pass the count to the callback.
-        MongoClient.connect('mongodb://localhost:27017/mongomart', function(err, db) {
-            assert.equal(err, null);
-            var query;
-            if(category === 'All') {
-                query = {};
-            }
-            else {
-                query = {"category":category};
-            }
-        
-            db.collection('item').find(query).count(function(err, docs) {
-                assert.equal(err, null);
-                callback(docs);
-            });
-        }); 
+        // MongoClient.connect('mongodb://localhost:27017/mongomart', function(err, db) {
+        //     assert.equal(err, null);
+            
+        // }); 
     }
 
 
@@ -213,19 +210,24 @@ function ItemDAO(database) {
          * description. You should simply do this in the mongo shell.
          *
          */
+        if(query) {
+            // console.log(query);
+            var statement = query;
+            var query = {$text:{$search:statement}};
+            var sortQuery = {score:{$meta:'textScore'}};
+            var skip_items = page*itemsPerPage;
+            var options = ({
+                "limit":itemsPerPage,
+                "skip":skip_items,
+                "sort":sortQuery
+            });
 
-        var item = this.createDummyItem();
-        var items = [];
-        for (var i=0; i<5; i++) {
-            items.push(item);
+            this.db.collection('item').find(query, {score:{$meta:'textScore'}}, options).toArray(function(err, docs) {
+                assert.equal(err, null);
+                // console.log(docs);
+                callback(docs);
+            });
         }
-
-        // TODO-lab2A Replace all code above (in this method).
-
-        // TODO Include the following line in the appropriate
-        // place within your code to pass the items for the selected page
-        // of search results to the callback.
-        callback(items);
     }
 
 
@@ -246,8 +248,17 @@ function ItemDAO(database) {
         * a SINGLE text index on title, slogan, and description. You should
         * simply do this in the mongo shell.
         */
-
-        callback(numItems);
+        if(query) {
+            // console.log(query);
+            var statement = query;
+            var query = {$text:{$search:statement}};
+            
+            this.db.collection('item').find(query).count(function(err, docs) {
+                assert.equal(err, null);
+                // console.log(docs);
+                callback(docs);
+            });
+        }
     }
 
 
@@ -264,14 +275,13 @@ function ItemDAO(database) {
          *
          */
 
-        var item = this.createDummyItem();
-
-        // TODO-lab3 Replace all code above (in this method).
-
-        // TODO Include the following line in the appropriate
-        // place within your code to pass the matching item
-        // to the callback.
-        callback(item);
+        var query = {"_id":itemId};
+        
+        this.db.collection('item').findOne(query, function(err, docs) {
+            assert.equal(err, null);
+            // console.log(docs);
+            callback(docs);
+        });
     }
 
 
@@ -309,6 +319,14 @@ function ItemDAO(database) {
             date: Date.now()
         }
 
+        var query = { "_id":itemId };
+
+
+        this.db.collection('item').update(query, { $push : {"reviews":reviewDoc} }, function(err, res) {
+            console.log(res);
+            callback(res);
+        });
+
         // TODO replace the following two lines with your code that will
         // update the document with a new review.
         var doc = this.createDummyItem();
@@ -317,7 +335,7 @@ function ItemDAO(database) {
         // TODO Include the following line in the appropriate
         // place within your code to pass the updated doc to the
         // callback.
-        callback(doc);
+        
     }
 
 
